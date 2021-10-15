@@ -8,7 +8,7 @@ import Load from './Load';
 
 export default function ImageGallery({ images, status, setModalImg }) {
   if (status === 'idle') {
-    return null;
+    return <></>;
   }
 
   if (status === 'pending') {
