@@ -1,118 +1,92 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+import imageApi from './services/imageApi';
 import Searchbar from './components/Searchbar';
 import ImageGallery from './components/ImageGallery';
 import Button from './components/button/Button';
 import Modal from './components/Modal';
 
-class App extends Component {
-  state = {
-    images: [],
-    query: '',
-    page: 1,
-    tags: null,
-    webformatURL: null,
-    largeImageURL: null,
-    error: null,
-    showModal: false,
-    status: 'idle',
-  };
+export default function App() {
+  const [images, setImages] = useState([]);
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [tags, setTags] = useState(null);
+  const [webformatURL] = useState(null);
+  const [largeImageURL, setLargeImageURL] = useState(null);
+  const [error, setError] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [status, setStatus] = useState('idle');
 
-  componentDidUpdate(prevProps, prevState) {
-    console.log(prevState);
-    const prevName = prevState.query;
-    const nextName = this.state.query;
-
-    if (prevName !== nextName) {
-      this.setState({ status: 'pending', images: [], page: 1 });
-
-      this.fetchImages();
+  useEffect(() => {
+    if (!query) {
+      return;
     }
+    setStatus('pending');
+    setImages([]);
+    setPage(1);
+    fetchImages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
+  function fetchImages() {
+    imageApi(query, page)
+      .then(images => {
+        setImages(prevState => [...prevState, ...images]);
+        setPage(prevState => prevState + 1);
+        if (page > 1) {
+          handleScroll();
+        }
+        setStatus('resolved');
+      })
+      .catch(error => setStatus('rejected'), setError(error))
+      .finally(() => setStatus('resolved'));
   }
 
-  fetchImages = () => {
-    const { query, page } = this.state;
-    const API_KEY = '22966044-c718c1bbe050e09f7279dea2f';
+  function toggleModal() {
+    setShowModal(prevState => !prevState);
+  }
 
-    fetch(
-      `https://pixabay.com/api/?q=${query}&page=${page}&key=${API_KEY}&image_type=photo&orientation=horizontal&per_page=12`,
-    )
-      .then(response => {
-        if (response.ok) {
-          // console.log(images.length);
+  function setModalImg({ largeImageURL, tags }) {
+    setLargeImageURL(largeImageURL);
+    setTags(tags);
+    toggleModal();
+  }
 
-          // if (images.length === 0) {
-          //   return toast.error(`Нет изображения с названием ${query}`);
-          // }
-
-          return response.json();
-        }
-        return Promise.reject(this.setState({ status: 'rejected' }));
-      })
-      .then(array => {
-        this.setState(prevState => ({
-          images: [...prevState.images, ...array.hits],
-          page: prevState.page + 1,
-          status: 'resolved',
-        }));
-
-        if (page > 1) {
-          this.handleScroll();
-        }
-      })
-      .catch(error => this.setState({ error, status: 'rejected' }))
-      .finally(() => this.setState({ status: 'resolved' }));
-  };
-
-  toggleModal = () => {
-    this.setState(({ showModal }) => ({ showModal: !showModal }));
-  };
-
-  setModalImg = ({ largeImageURL, tags }) => {
-    this.setState({ largeImageURL, tags });
-    this.toggleModal();
-  };
-
-  handleScroll = () => {
+  function handleScroll() {
     window.scrollTo({
       top: document.documentElement.scrollHeight,
       behavior: 'smooth',
     });
-  };
-
-  onSubmit = query => {
-    this.setState({ query: query, page: 1 });
-  };
-
-  render() {
-    const { images, status, showModal, tags, webformatURL, largeImageURL } =
-      this.state;
-
-    return (
-      <>
-        <Searchbar onSubmit={this.onSubmit} />
-        <ImageGallery
-          images={images}
-          tags={tags}
-          webformatURL={webformatURL}
-          largeImageUR={largeImageURL}
-          status={status}
-          setModalImg={this.setModalImg}
-        />
-        {images.length > 0 && <Button onLoadMore={this.fetchImages} />}
-        {showModal && (
-          <Modal onClose={this.toggleModal}>
-            <img src={largeImageURL} alt={tags} />
-          </Modal>
-        )}
-        <ToastContainer />
-      </>
-    );
   }
-}
 
-export default App;
+  function onSubmit(query) {
+    setQuery(query);
+    setImages([]);
+    setPage(1);
+  }
+
+  return (
+    <>
+      <Searchbar onSubmit={onSubmit} />
+      <ImageGallery
+        images={images}
+        tags={tags}
+        webformatURL={webformatURL}
+        largeImageUR={largeImageURL}
+        status={status}
+        setModalImg={setModalImg}
+      />
+      {images.length > 0 && <Button onLoadMore={fetchImages} />}
+      {showModal && (
+        <Modal onClose={toggleModal}>
+          <img src={largeImageURL} alt={tags} />
+        </Modal>
+      )}
+      <ToastContainer />
+    </>
+  );
+}
